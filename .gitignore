@@ -1,0 +1,15 @@
+# User data: missions, documents, password hash, logs
+data/
+# Generated house-style templates
+modeles/
+# Python
+.venv/
+__pycache__/
+*.pyc
+# Local secrets and databases
+.env
+*.sqlite3*
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
