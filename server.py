@@ -27,6 +27,7 @@ import zipfile
 import antigravity_adapter
 import formats
 import i18n
+import inspection
 import verification
 from i18n import L
 from http import HTTPStatus
@@ -178,6 +179,10 @@ def tidy(work):
         dirs[:] = [d for d in dirs if d not in JUNK_DIRS]
         for n in names:
             if n.endswith('.pyc'): (Path(parent)/n).unlink(missing_ok=True)
+
+def own_files(work):
+    # Files an agent made itself: not what it was given, not tool caches.
+    return [work/f['path'] for f in files_under(work) if not f['path'].startswith(GIVEN) and not any(p in JUNK_DIRS for p in f['path'].split('/'))]
 
 def files_under(root):
     if not root.exists():
@@ -706,10 +711,18 @@ class Atelier:
             raise
     def checks(self,m,index,work,result):
         problems,unverified,blocked=verification.check(result,work) if m.get('verify') else ([],[],[])
+        problems=list(problems)
         if index==len(m['steps'])-1 and m.get('formats'):
             # The deliverable must compile: LaTeX errors go back to the agent like missing sources.
             with tempfile.TemporaryDirectory() as tmp:
                 problems+=[formats.FORMATS[f][0]+L(' : la conversion échoue — ',': conversion fails — ')+error for f,error in formats.render(result,m['name'],m['formats'],tmp,lang=m.get('language','fr')) if error]
+                # Then the file that will be delivered is opened and inspected: the agent's own file wins, as when the mission ends.
+                own=own_files(work)
+                for f in m['formats']:
+                    ext='.'+formats.FORMATS[f][1];made=[x for x in own if x.suffix.lower()==ext]
+                    target=max(made,key=lambda x:x.stat().st_mtime) if made else Path(tmp)/('livrable'+ext)
+                    if target.exists():problems+=inspection.check(target,m.get('language'))
+        elif index==len(m['steps'])-1:problems+=inspection.answer(result,m.get('language'))
         return problems,unverified,blocked
     def verify_step(self,id,m,index,agent,work,prompt,result,invoke):
         name=agent['name']
@@ -724,7 +737,9 @@ class Atelier:
             if self.stopped(id): raise Stopped()
             self.store.event(id,L('Vérification automatique : ','Automatic check: ')+str(len(problems))+L(' problème(s). Renvoi à l’agent pour correction (',' problem(s). Sent back to the agent for correction (')+str(attempt+1)+'/'+str(MAX_FIXES)+') :\n- '+'\n- '.join(problems),'warning',name)
             result=invoke(prompt+'\n\nAUTOMATIC CHECK (correction '+str(attempt+1)+'/'+str(MAX_FIXES)+'): Atelier checked your previous answer, without artificial intelligence, and found these problems:\n- '+'\n- '.join(problems)+
-                          '\nFix your answer: replace each source that cannot be found with a real source you are certain of, or remove the claim that depends on it; fix the formatting errors. '
+                          '\nFix your answer: replace each source that cannot be found with a real source you are certain of, or remove the claim that depends on it; '
+                          'for a figure or quotation not found in its source, use the exact figure or wording of the source, cite the page that actually contains it, or remove it; '
+                          'fix the formatting errors and the defects found in your deliverable file (rebuild the file if you made it yourself). '
                           'Give your complete final answer again: it replaces the previous one.\n\nYOUR PREVIOUS ANSWER:\n'+result[:20000])
         return {'result':result,'problems':problems,'unverified':unverified,'blocked':blocked,'corrections':attempt}
     def record_verified(self,provider,model,source):
@@ -976,8 +991,7 @@ class Atelier:
         p=ROOT/'static'/assets[path]
         return 200,p.read_bytes(),mimetypes.guess_type(p.name)[0] or 'application/octet-stream',[]
     def agent_files(self,id,index,agent):
-        work=self.mission_dir(id)/'agents'/('%02d-%s'%(index+1,agent['id']))
-        return [work/f['path'] for f in files_under(work) if not f['path'].startswith(GIVEN) and not any(p in JUNK_DIRS for p in f['path'].split('/'))]
+        return own_files(self.mission_dir(id)/'agents'/('%02d-%s'%(index+1,agent['id'])))
     def deliverables(self,id,m):
         # Only what was asked for: one file per requested format, else the final text.
         wanted={'livrable.'+formats.FORMATS[f][1] for f in m.get('formats') or []} or {'livrable.md'}
