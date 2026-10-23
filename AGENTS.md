@@ -11,7 +11,8 @@ Dashboard web personnel qui compose des équipes d'agents (Claude Code, Codex, G
 - `antigravity_adapter.py` : commande `agy`, protocole `stream-json`, contrôle des permissions Antigravity, verrou lecture seule.
 - `formats.py` : formats de rendu (PDF, Word, PowerPoint, LaTeX) ; consignes à l'agent final et conversion par Pandoc (`pypandoc_binary`) et XeLaTeX.
 - `i18n.py` : langue de l’interface (`L(fr, en)`), réglée par `settings.json` (`language`).
-- `verification.py` : vérification déterministe, sans IA, des sources citées (liens, DOI, arXiv, fichiers). En cas d'échec, `Atelier.verify_step` renvoie les erreurs à l'agent (`MAX_FIXES` corrections au plus).
+- `verification.py` : vérification déterministe, sans IA, des sources citées (liens, DOI, arXiv, fichiers), et des chiffres et citations qu’on leur attribue (`claims`). En cas d'échec, `Atelier.verify_step` renvoie les erreurs à l'agent (`MAX_FIXES` corrections au plus).
+- `inspection.py` : contrôle déterministe du fichier livré par l’agent final (PPTX et DOCX lus comme XML, PDF par Poppler) : diapositives vides ou débordantes, images manquantes, texte provisoire, langue. Bibliothèque standard uniquement.
 - `static/` : interface en un seul fichier `app.js` (JavaScript sans framework ni build) + `style.css` + `index.html`.
 - `tests/` : `unittest`, avec des exécutables simulés. Aucun appel à un vrai modèle.
 - `Dockerfile`, `docker-compose.yml`, `scripts/docker-entrypoint.sh` : installation Docker (recommandée). Le code est en lecture seule dans `/app`, les données dans le volume `/data`.

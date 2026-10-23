@@ -43,7 +43,8 @@ Everything runs on your VM: your documents, missions and deliverables stay on th
 | **Reference design level** | Upload a deck or report you consider well made: the final agent receives page previews and aims at least that high. |
 | **Revisions** | Revise a finished mission in one sentence: only the final agent picks the deliverable up again. |
 | **Projects and context** | Source documents per project, optional project context, global context for every mission. |
-| **Verified sources** | Every cited link, DOI or arXiv ID is checked without AI; a missing source is sent back to the agent for correction. Paywalled articles are listed so you can add them yourself. |
+| **Verified sources** | Every cited link, DOI or arXiv ID is checked without AI; a missing source is sent back to the agent for correction. Figures and quotations must appear in the page or document cited next to them; figures with no source are flagged. Paywalled articles are listed so you can add them yourself. |
+| **Inspected deliverable** | Atelier opens the final file itself: empty slides, elements off the slide, overflowing text, missing images, leftover placeholders (“TODO”, “[à compléter]”) or the wrong language are sent back to the final agent. |
 | **Live follow-up** | Activity log, notes added mid-mission, approval between steps, pause, resume, stop. |
 | **Demo mode** | A fully simulated run, with no call to any assistant. |
 | **English or French** | The whole interface and the deliverables follow your language choice. |
@@ -229,7 +230,8 @@ Atelier is designed for **a single trusted user on a dedicated VM or container**
 atelier-agents/
 ├── server.py               # WSGI app: SQLite storage, API, missions, prompts, assistant launch
 ├── formats.py              # Output formats, PowerPoint and Word templates, Pandoc conversion, previews
-├── verification.py         # Deterministic source checks (links, DOI, arXiv, files)
+├── verification.py         # Deterministic source checks (links, DOI, arXiv, files), figures and quotations
+├── inspection.py           # Deterministic checks on the deliverable file (PPTX, DOCX, PDF, TeX)
 ├── antigravity_adapter.py  # agy command, stream-json protocol, permissions, read-only lock
 ├── i18n.py                 # Interface language (English or French)
 ├── requirements.txt        # Gunicorn and Pandoc (bundled)
