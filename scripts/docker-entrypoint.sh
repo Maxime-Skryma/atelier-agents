@@ -11,7 +11,7 @@ mkdir -p "$ATELIER_DATA"
 # Antigravity keeps its Google session in ~/.gemini (volume) and its binary in /opt/agy/bin (volume).
 [ -x /opt/agy/bin/agy ] || command -v agy >/dev/null || printf 'Optional: install Gemini · Antigravity (agy) following Google’s documentation, binary in /opt/agy/bin.\n'
 [ -f "$CLAUDE_CONFIG_DIR/.credentials.json" ] || printf 'To do: log in to Claude Code with "docker exec -it atelier claude", then /login.\n'
-[ -f "$CODEX_HOME/auth.json" ] || printf 'To do: log in to Codex with "docker exec -it atelier codex login".\n'
+[ -f "$CODEX_HOME/auth.json" ] || printf 'To do: log in to Codex with "docker exec -it atelier codex login --device-auth".\n'
 
 set_password() {
   if [ -n "${ATELIER_PASSWORD:-}" ]; then
