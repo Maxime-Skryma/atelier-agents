@@ -74,13 +74,76 @@ Creators never see each other’s work, so their proposals stay independent. The
 
 ## Installation
 
-### Requirements
+Three options:
+
+| | For | Isolation |
+|---|---|---|
+| **[A. Docker](#a-docker-recommended)** (recommended) | your computer or a VPS with Docker | the container |
+| **[B. VM with `start.sh`](#b-vm-with-startsh-debian-ubuntu-onyxia)** | a dedicated Debian/Ubuntu VM, Onyxia | the VM |
+| **[C. Demo mode](#c-demo-mode)** | a quick look, nothing to connect | none needed: no assistant is called |
+
+All options need at least one subscription: Claude (Pro or Max), ChatGPT (Plus or Pro), or Google (for Gemini · Antigravity). Assistants use **your subscriptions**, never API keys: Atelier passes them only a short allow-list of environment variables, with no API key.
+
+### A. Docker (recommended)
+
+Requires Docker Engine with the Compose plugin (Docker Desktop on macOS and Windows). A step-by-step guide in French is in [docs/installation-docker.pdf](docs/installation-docker.pdf).
+
+```bash
+git clone https://github.com/Maxime-Skryma/atelier-agents.git
+cd atelier-agents
+docker compose build                     # 10–20 min the first time
+docker compose run --rm atelier init     # choose the dashboard password (12 characters minimum)
+docker compose up -d
+```
+
+Open <http://localhost:8765/>. The port is published on `127.0.0.1` only: on a VPS, open it through an SSH tunnel (`ssh -L 8765:127.0.0.1:8765 user@your-vps`) or a HTTPS reverse proxy, with `ATELIER_PUBLIC_URL` set in a `.env` file next to `docker-compose.yml`.
+
+Instead of `init`, you can put `ATELIER_PASSWORD=…` in `.env` for the first start; it is hashed into `data/settings.json`, and you should then remove it from `.env`.
+
+**Connect the assistants** (sessions are stored in volumes, never in the image):
+
+```bash
+docker exec -it atelier claude           # then /login
+docker exec -it atelier codex login --device-auth   # a code to enter in your browser
+```
+
+Use `--device-auth` for Codex: its default login waits for a callback on the container’s own `localhost`, which your browser cannot reach.
+
+Gemini · Antigravity is optional: install `agy` inside the container following Google’s documentation, keep its binary in `/opt/agy/bin` (a volume), then sign in with `docker exec -it atelier agy`. Finally, check **Connexions & réglages › Vérifier les connexions**.
+
+**Volumes** (Docker named volumes, local to the host):
+
+| Volume | Mounted on | Content |
+|---|---|---|
+| `atelier-data` | `/data` | database, missions, documents, password hash, logs |
+| `claude` | `/home/atelier/.claude` | Claude Code session |
+| `codex` | `/home/atelier/.codex` | Codex session |
+| `gemini` | `/home/atelier/.gemini` | Antigravity session |
+| `agy` | `/opt/agy` | `agy` binary |
+
+Keep `atelier-data` on a local disk: SQLite runs in WAL mode and must not sit on a network share. Compose prefixes volume names with the project folder (e.g. `atelier-agents_atelier-data`).
+
+**Back up `data/`** (stop the service first so the database is consistent):
+
+```bash
+docker compose stop
+docker run --rm -v atelier-agents_atelier-data:/data -v "$PWD":/backup debian:bookworm-slim \
+  tar czf /backup/atelier-data-$(date +%F).tar.gz -C /data .
+docker compose start
+```
+
+**Update:** `git pull && docker compose up -d --build`. Data and logins are kept.
+
+Build options: `--build-arg WITH_LATEX=0` for a smaller image without XeLaTeX (no PDF deliverables), `CLAUDE_CODE_VERSION` and `CODEX_VERSION` to pin the assistants’ versions. Memory, CPU and process limits are set in `docker-compose.yml` (`mem_limit`, `cpus`, `pids_limit`).
+
+### B. VM with `start.sh` (Debian, Ubuntu, Onyxia)
+
+#### Requirements
 
 - A **Debian or Ubuntu** Linux VM with Python 3.11+ (`python3-venv`) and sudo access (for LibreOffice).
-- At least one subscription: Claude (Pro or Max), ChatGPT (Plus or Pro), or Google (for Gemini · Antigravity).
 - **A dedicated VM**: agents can run code on the machine (see [Security](#security-and-limits)).
 
-### 1. Get it and start it
+#### 1. Get it and start it
 
 ```bash
 git clone https://github.com/Maxime-Skryma/atelier-agents.git
@@ -97,7 +160,7 @@ On first run, the script:
 
 Run the same command after the VM restarts: it only reinstalls what is missing.
 
-### 2. Open the dashboard
+#### 2. Open the dashboard
 
 The server only listens on the machine itself. From your computer, open an SSH tunnel:
 
@@ -109,7 +172,7 @@ then open <http://localhost:8765/>.
 
 Behind an HTTPS proxy or a remote VS Code, pass the public address to the script: `bash scripts/start.sh 'https://your-address/proxy/8765/'`. On **Onyxia** (SSP Cloud) it is detected automatically: see [docs/installation-onyxia.md](docs/installation-onyxia.md).
 
-### 3. Connect the assistants
+#### 3. Connect the assistants
 
 In a terminal on the VM, log in to the ones you will use:
 
@@ -119,9 +182,18 @@ In a terminal on the VM, log in to the ones you will use:
 | Codex | automatic (`start.sh`, via npm) | `codex login` |
 | Gemini · Antigravity | `agy` CLI, install it following Google’s documentation | `agy`, then sign in with Google |
 
-Assistants use **your subscriptions**, never API keys: Atelier passes them only a short allow-list of environment variables, with no API key. Then check **Connexions & réglages › Vérifier les connexions**.
+Then check **Connexions & réglages › Vérifier les connexions**.
 
-> Want to try it without connecting anything? `python3 server.py --demo --data /tmp/atelier-demo` starts a simulated demo on <http://127.0.0.1:8765/>.
+### C. Demo mode
+
+To try it without connecting anything, with no password and no assistant called:
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 server.py --demo --data /tmp/atelier-demo
+```
+
+It starts a simulated demo on <http://127.0.0.1:8765/> (local machine only). With Docker, any mission can also be launched with the **demo** execution: a simulated run, without any quota used.
 
 ## Getting started
 
@@ -140,11 +212,13 @@ Assistants use **your subscriptions**, never API keys: Atelier passes them only 
 
 ## Security and limits
 
-Atelier is designed for **a single trusted user on a dedicated VM**. Read this before installing:
+Atelier is designed for **a single trusted user on a dedicated VM or container**. Read this before installing:
 
 - **Agents act on the machine.** Codex runs without its sandbox (`danger-full-access`), because the sandbox does not work in most containers. It can run commands with your permissions. Claude Code has no terminal (file read and write, and web only); Antigravity is limited to the mission folder, with no terminal and no web.
+- **With Docker, the container is the isolation boundary.** Codex can read and write everything the `atelier` user can inside the container: the data volume and the assistants’ sessions included, but not the application code (read-only) nor the host’s files, since no host folder and no Docker socket is mounted. The container runs as a non-root user, without extra capabilities (`cap_drop: ALL`, `no-new-privileges`), with memory, CPU and process limits. It still shares the host’s kernel: it is less watertight than a VM, and a kernel flaw could let code escape it. Agents also have full network access.
+- **Listening address.** On a VM, the server listens on `127.0.0.1` only. In the container it listens on all of the container’s interfaces, and `docker-compose.yml` publishes the port on the host’s `127.0.0.1` only: do not change that mapping to `0.0.0.0` without a HTTPS proxy in front.
 - **Real read-only mode.** A read-only mission locks its working folder on disk and rejects the result if any file changed.
-- **Protected dashboard.** Hashed password (PBKDF2-SHA256, 600,000 iterations), `HttpOnly` and `SameSite=Strict` session cookie, CSRF check through a header and the origin, listening on `127.0.0.1` only.
+- **Protected dashboard.** Hashed password (PBKDF2-SHA256, 600,000 iterations), `HttpOnly` and `SameSite=Strict` session cookie, CSRF check through a header and the origin, reachable from the machine itself only.
 - **Assistant sessions.** Atelier never reads, copies or keeps Claude, Codex or Google sessions: it only checks that one exists.
 - **Web access.** For personal use, agents ignore `robots.txt` files and “no automated access” notices, but never bypass a subscription, a login or a captcha.
 - **Quotas.** Every mission uses your subscription quotas. At most two missions run at the same time.
@@ -159,12 +233,15 @@ atelier-agents/
 ├── antigravity_adapter.py  # agy command, stream-json protocol, permissions, read-only lock
 ├── i18n.py                 # Interface language (English or French)
 ├── requirements.txt        # Gunicorn and Pandoc (bundled)
+├── Dockerfile              # Container image: tools, assistants' CLIs, non-root user
+├── docker-compose.yml      # Service, port on 127.0.0.1, volumes, limits
 ├── static/                 # UI: app.js with no framework or build step, style.css, index.html
 ├── scripts/
-│   ├── start.sh            # Install and start (onyxia.sh: alias)
-│   └── reload.sh           # Reload without downtime after a code change
+│   ├── start.sh            # Install and start on a VM (onyxia.sh: alias)
+│   ├── reload.sh           # Reload without downtime after a code change
+│   └── docker-entrypoint.sh  # Container start: dashboard password, Gunicorn
 ├── tests/                  # unittest, simulated assistants, no call to a real model
-├── docs/                   # Onyxia guide and screenshots
+├── docs/                   # Onyxia and Docker guides, screenshots
 ├── AGENTS.md               # Guidelines for contributors and coding assistants (CLAUDE.md links here)
 └── data/                   # Your data (created at startup, never committed)
 ```

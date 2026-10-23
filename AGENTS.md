@@ -14,6 +14,7 @@ Dashboard web personnel qui compose des équipes d'agents (Claude Code, Codex, G
 - `verification.py` : vérification déterministe, sans IA, des sources citées (liens, DOI, arXiv, fichiers). En cas d'échec, `Atelier.verify_step` renvoie les erreurs à l'agent (`MAX_FIXES` corrections au plus).
 - `static/` : interface en un seul fichier `app.js` (JavaScript sans framework ni build) + `style.css` + `index.html`.
 - `tests/` : `unittest`, avec des exécutables simulés. Aucun appel à un vrai modèle.
+- `Dockerfile`, `docker-compose.yml`, `scripts/docker-entrypoint.sh` : installation Docker (recommandée). Le code est en lecture seule dans `/app`, les données dans le volume `/data`.
 - `scripts/start.sh` : installation et démarrage du service (`onyxia.sh` en est un alias). `scripts/reload.sh` : rechargement après modification.
 - `data/` : **données de l'utilisateur** (base `atelier.sqlite3`, `settings.json` avec le hash du mot de passe, missions, journaux). Ne jamais modifier, supprimer ou committer.
 
@@ -37,6 +38,6 @@ Ne modifie pas ces mécanismes sans demande explicite de l'utilisateur, et signa
 - `safe_file` (pas de sortie du dossier, pas de liens symboliques) ;
 - permissions des assistants dans `Atelier.command` et `antigravity_adapter.permission_problem` ; le verrou `read_only` et la comparaison `snapshot` des missions en lecture seule ;
 - `agent_env` : les assistants utilisent les abonnements connectés, sans hériter des clés d'API ;
-- le serveur écoute uniquement sur `127.0.0.1:8765`.
+- le serveur écoute uniquement sur `127.0.0.1:8765` ; seule exception, dans le conteneur Docker (`scripts/docker-entrypoint.sh`) il écoute sur `0.0.0.0:8765`, et `docker-compose.yml` ne publie le port que sur `127.0.0.1` de l’hôte. Ne monte jamais `/var/run/docker.sock` ni un dossier de l’hôte autre que les volumes déclarés.
 
 N'affiche, ne copie et ne transmets jamais le contenu de `data/settings.json`, des sessions (`~/.codex`, `~/.gemini`, `~/.claude`) ni de jetons.
