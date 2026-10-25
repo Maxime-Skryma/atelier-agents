@@ -1,0 +1,37 @@
+# Atelier with Docker. First start: docker compose run --rm atelier init, then docker compose up -d.
+# The dashboard is published on this machine only (127.0.0.1); from elsewhere, use an SSH tunnel or a proxy.
+services:
+  atelier:
+    build: .
+    image: atelier:local
+    container_name: atelier
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      # Public HTTPS address when Atelier sits behind a proxy (e.g. https://atelier.example.com/). Empty for localhost.
+      ATELIER_PUBLIC_URL: ${ATELIER_PUBLIC_URL:-}
+      # Optional, first start only: remove it from .env once the password is saved.
+      ATELIER_PASSWORD: ${ATELIER_PASSWORD:-}
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # Local volumes only: SQLite runs in WAL mode and must not sit on a network share.
+      - atelier-data:/data
+      - claude:/home/atelier/.claude
+      - codex:/home/atelier/.codex
+      - gemini:/home/atelier/.gemini
+      - agy:/opt/agy
+    restart: unless-stopped
+    mem_limit: 6g
+    cpus: 4
+    pids_limit: 1024
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  atelier-data:
+  claude:
+  codex:
+  gemini:
+  agy:
